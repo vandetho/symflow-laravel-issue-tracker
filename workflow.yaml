@@ -1,0 +1,64 @@
+framework:
+    workflows:
+        issue_tracking:
+            type: workflow
+            marking_store:
+                type: property
+                property: marking
+            supports: [App\Models\Issue]
+            initial_marking: open
+            places:
+                open:
+                    metadata:
+                        description: 'Triaged, not started'
+                in_progress:
+                    metadata:
+                        description: 'Being worked on'
+                code_review:
+                    metadata:
+                        description: 'Awaiting code review'
+                qa_review:
+                    metadata:
+                        description: 'Awaiting QA'
+                code_approved:
+                    metadata:
+                        description: 'Code review passed'
+                qa_approved:
+                    metadata:
+                        description: 'QA passed'
+                merged:
+                    metadata:
+                        description: Shipped
+                closed:
+                    metadata:
+                        description: 'Closed without merging'
+            transitions:
+                start_work:
+                    from: open
+                    to: in_progress
+                submit_for_review:
+                    from: in_progress
+                    to: [code_review, qa_review]
+                approve_code:
+                    from: code_review
+                    to: code_approved
+                    guard: 'role:reviewer'
+                approve_qa:
+                    from: qa_review
+                    to: qa_approved
+                    guard: 'role:qa'
+                reject_code:
+                    from: code_review
+                    to: closed
+                    guard: 'role:reviewer'
+                reject_qa:
+                    from: qa_review
+                    to: closed
+                    guard: 'role:qa'
+                merge:
+                    from: [code_approved, qa_approved]
+                    to: merged
+                    guard: 'role:reviewer'
+                close:
+                    from: open
+                    to: closed
