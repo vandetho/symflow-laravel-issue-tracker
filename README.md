@@ -14,26 +14,63 @@ A runnable showcase for [`vandetho/symflow-laravel`](https://github.com/vandetho
 | Workflow event listeners | `WorkflowEventType::Entered` listener logs each hop in `WorkflowServiceProvider::boot` |
 | Live diagram | `MermaidExporter` output gets `classDef` highlighting injected per active place |
 
-## Quick start
+## The flow
 
-Requires PHP 8.2+, Composer, Node 20+, and a clone of [`symflow-laravel`](https://github.com/vandetho/symflow-laravel) sitting at `../symflow-laravel`.
+```mermaid
+flowchart LR
+    open([open]) -->|start_work| in_progress[in_progress]
+    open -->|close| closed([closed])
+
+    in_progress -->|submit_for_review| code_review[code_review]
+    in_progress -->|submit_for_review| qa_review[qa_review]
+
+    code_review -->|"approve_code&nbsp;&#40;role:reviewer&#41;"| code_approved[code_approved]
+    qa_review -->|"approve_qa&nbsp;&#40;role:qa&#41;"| qa_approved[qa_approved]
+
+    code_review -->|"reject_code&nbsp;&#40;role:reviewer&#41;"| closed
+    qa_review -->|"reject_qa&nbsp;&#40;role:qa&#41;"| closed
+
+    code_approved -->|"merge&nbsp;&#40;role:reviewer&#41;"| merged([merged])
+    qa_approved -->|merge| merged
+
+    classDef good fill:#bbf7d0,stroke:#16a34a,color:#14532d;
+    classDef bad fill:#fecdd3,stroke:#e11d48,color:#9f1239;
+    class merged good;
+    class closed bad;
+```
+
+A `workflow` (Petri net) — `submit_for_review` and `merge` operate on multiple tokens simultaneously.
+
+## Run it locally
+
+Requires **PHP 8.2+**, **Composer**, **Node 20+**, and a clone of [`symflow-laravel`](https://github.com/vandetho/symflow-laravel) sitting at `../symflow-laravel` (the package is consumed via a Composer **path repository**).
 
 ```bash
-git clone https://github.com/vandetho/symflow-laravel.git              # sibling
+# 1. Clone both repos as siblings
+git clone https://github.com/vandetho/symflow-laravel.git
 git clone https://github.com/vandetho/symflow-laravel-issue-tracker.git
 
+# 2. Install
 cd symflow-laravel-issue-tracker
 composer install
 npm install
+
+# 3. Configure
 cp .env.example .env
 php artisan key:generate
 touch database/database.sqlite
+
+# 4. Build database + frontend
 php artisan migrate:fresh --seed
 npm run build
+
+# 5. Serve
 php artisan serve
 ```
 
-Open <http://localhost:8000> and use the **role switcher** in the top-right.
+Open <http://localhost:8000> and use the **role switcher** in the top-right to sign in as a demo user.
+
+> **Tip — live frontend reload:** in a second terminal run `npm run dev` instead of `npm run build` and Vite hot-reloads CSS/JS changes.
 
 ### Seeded users
 
@@ -44,21 +81,9 @@ Open <http://localhost:8000> and use the **role switcher** in the top-right.
 | Reviewer | Linus Torvalds | `linus@symflow.test` | `password` |
 | QA | Margaret Hamilton | `margaret@symflow.test` | `password` |
 
-## The workflow
+## The workflow definition
 
-Defined in [`config/laraflow.php`](config/laraflow.php):
-
-```
-                                              ┌─ code_review ── approve_code ── code_approved ─┐
-open ── start_work ── in_progress ── submit ──┤                                                ├── merge ── merged
-                                              │                                                │     [role:reviewer]
-                                              └─ qa_review ──── approve_qa ──── qa_approved ───┘
-
-  reject_code | reject_qa  →  closed
-  close (from open)         →  closed
-```
-
-This is a `workflow` (Petri net) — `submit_for_review` and `merge` operate on multiple tokens.
+Lives in [`config/laraflow.php`](config/laraflow.php) — same Symfony `framework.workflows` shape symflowbuilder.com exports.
 
 ## Architecture
 
