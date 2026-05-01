@@ -67,14 +67,18 @@ class IssueShow extends Component
         $this->issue->refresh();
     }
 
-    public function getEnabledTransitionsProperty(): array
+    /**
+     * @return array{available: array<int, mixed>, awaiting: array<int, mixed>, inactive: array<int, mixed>}
+     */
+    public function getGroupedTransitionsProperty(): array
     {
         $workflow = app(WorkflowRegistryInterface::class)->get('issue_tracking');
-        $rows = [];
+
+        $groups = ['available' => [], 'awaiting' => [], 'inactive' => []];
 
         foreach ($workflow->definition->transitions as $transition) {
             $result = $workflow->can($this->issue, $transition->name);
-            $blockerReason = $result->blockers[0]->message ?? null;
+            $blocker = $result->blockers[0] ?? null;
 
             $intent = match (true) {
                 str_starts_with($transition->name, 'reject'), $transition->name === 'close' => 'destructive',
@@ -83,21 +87,30 @@ class IssueShow extends Component
                 default => 'neutral',
             };
 
-            $rows[] = [
+            $row = [
                 'transition' => $transition,
                 'allowed' => $result->allowed,
-                'reason' => $blockerReason,
+                'reason' => $blocker?->message,
+                'code' => $blocker?->code,
                 'intent' => $intent,
             ];
+
+            if ($result->allowed) {
+                $groups['available'][] = $row;
+            } elseif (in_array($blocker?->code, ['not_authenticated', 'wrong_role', 'guard_blocked', 'unknown_guard'], true)) {
+                $groups['awaiting'][] = $row;
+            } else {
+                $groups['inactive'][] = $row;
+            }
         }
 
-        return $rows;
+        return $groups;
     }
 
     public function render()
     {
         return view('livewire.pages.issue-show', [
-            'enabledTransitions' => $this->enabledTransitions,
+            'grouped' => $this->groupedTransitions,
             'activePlaces' => $this->issue->activePlaces(),
             'currentUser' => Auth::user(),
         ]);
